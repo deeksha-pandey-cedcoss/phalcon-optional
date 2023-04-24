@@ -7,6 +7,11 @@ use Phalcon\Mvc\Application;
 use Phalcon\Url;
 use Phalcon\Db\Adapter\Pdo\Mysql;
 use Phalcon\Config;
+use Phalcon\Config\ConfigFactory;
+use Phalcon\Config\Adapter\Php;
+use Phalcon\Session\Manager;
+use Phalcon\Session\Adapter\Stream;
+use Phalcon\Escaper;
 
 $config = new Config([]);
 
@@ -36,6 +41,20 @@ $container->set(
         return $view;
     }
 );
+$container->set(
+    'logger',
+    function () {
+        $adapter = new Stream(APP_PATH .'/logs/attack.log');
+        $logger  = new Logger(
+            'messages',
+            [
+                'main' => $adapter,
+            ]
+        );
+
+        return $logger;
+    }
+);
 
 $container->set(
     'url',
@@ -45,34 +64,61 @@ $container->set(
         return $url;
     }
 );
-
-$application = new Application($container);
-
-
-
 $container->set(
     'db',
     function () {
-        return new Mysql(
-            [
-                'host'     => 'mysql-server',
-                'username' => 'root',
-                'password' => 'secret',
-                'dbname'   => 'phalt',
-                ]
-            );
-        }
+     return new Mysql($this['config']->db->toArray());
+    }
+);
+$container->set(
+    'escaper',
+    function ()  {
+        return new Escaper();
+    }
+);
+
+$application = new Application($container);
+
+$container->set(
+    'config',
+    function () {
+        $fileName='../app/config/config.php';
+
+        // $factory= new ConfigFactory();
+        // return $config=$factory->newInstance('php', $fileName);
+
+
+        $config = new Config([]);
+        $array = new Php($fileName);
+        return $config->merge($array);
+    }
 );
 
 $container->set(
-    'mongo',
+    'session',
     function () {
-        $mongo = new MongoClient();
-
-        return $mongo->selectDB('phalt');
-    },
-    true
+        $session = new Manager();
+        $files = new Stream(
+    [
+        'savePath' => '/tmp',
+    ]
 );
+        $session->setAdapter($files);
+        $session->start();
+    }
+);
+
+
+
+// $container->set(
+//     'mongo',
+//     function () {
+//         $mongo = new MongoClient();
+
+//         return $mongo->selectDB('phalt');
+//     },
+//     true
+// );
 
 try {
     // Handle the request
